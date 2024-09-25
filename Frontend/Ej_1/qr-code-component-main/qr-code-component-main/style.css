@@ -1,0 +1,32 @@
+body {
+    display: block;
+    width: 1440px;
+    height: 960px;
+    font-family: Arial, sans-serif;
+    background-color: #D5E1EF;
+}
+.componente_1{
+    margin-top: 230.5px;
+    margin-left: 560px;
+    width: 320px;
+    height: 499px;
+    background-color: white;
+    display: block;
+    position:absolute;
+    border-color: black;
+    border-radius: 20px;
+}
+.componente_2{
+    margin-top: 16px;
+    margin-left: 16px;
+    position: relative;
+    width: 288px;
+    height: 131px;
+}
+.componente_2 p{
+    margin-left: 16px;
+    margin-right: 16px;
+    color: #1F314F;
+    text-align: center;
+    font-size: 22px;
+}

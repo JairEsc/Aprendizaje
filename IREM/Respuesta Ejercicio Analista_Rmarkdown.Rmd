@@ -1,0 +1,146 @@
+---
+title: "Respuesta Ejercicio Analista"
+author: "Jair"
+date: "2024-08-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Introducción
+
+En este documento, se describe el proceso para calcular el índice de niños con peso adecuado para su edad, menores a 5 años. Para ello, se considera una base de datos que consiste en 872 madres encuestadas por 14 encuestadores, distribuidas geográficamente en 104 zonas. Consideramos una regla de decisión auxiliados de la tabla de pesos adjunta, en particular las primeras dos desviaciones estándar. Por último, se compara el resultado por zona y encuestador según su valor obtenido a partir del índice definido.
+# Desarrollo
+## Carga de Datos
+
+Primero, cargamos los datos desde un archivo Excel. Este archivo contiene dos hojas: una con los datos de los niños y otra con la tabla de referencia de pesos.
+
+```{r load-data, message=FALSE}
+setwd("../../")
+library(readxl)
+sheets <- excel_sheets("Ejercicios/IREM/base_sim_datos_peso_ord.xlsx")
+data <- read_excel("Ejercicios/IREM/base_sim_datos_peso_ord.xlsx", sheet = sheets[1])
+tabla_pesos <- read_excel("Ejercicios/IREM/base_sim_datos_peso_ord.xlsx", sheet = sheets[2])
+```
+
+## Filtrado de datos
+La restricción principal es considerar niños menores de 5 años. Además, la hipótesis de que cada zona es única nos permite concluir que cada madre encuestada es distinta. En tal caso, podemos asumir que cada madre encuestada es única. 
+
+De conocer que cada madre tiene al menos un niño menor a 5 años, nos permitiría considerar a su hijo menor para el cálculo del índice. 
+Con esto en mente, si $cualquiera$ de los hijos tiene edad menor a 5 años, la madre es considerada dentro de la muestra. Notar que del formato de la tabla de datos, podemos seleccionar fácilmente las edades de los hijos de cada madre a través de las columnas $4,8\ldots,32$. La cual es una propiedad que utilizaremos a lo largo del código.
+
+```{r filtro_1}
+data_filtrada <- data[apply(data, 1, function(x) any(x[1:8*4] == "M" & !is.na(x[1:8*4]))), ]
+```
+## Preparación de la Tabla de Referencia
+Seleccionamos las columnas de la tabla de pesos correspondientes al límite inferior y límite superior para definir los límites de peso según la edad en meses.
+
+```{r tabla_a_intervalos, message=FALSE}
+library(dplyr)
+tabla_pesos_intervalos <- tabla_pesos %>% 
+  select(Month, SD2neg, SD2) %>% 
+  rename(Mes = Month, LimiteInferior = SD2neg, LimiteSuperior = SD2)
+```
+##Función para Verificar Peso Adecuado
+Definimos una función que verifica si el peso de un niño es adecuado según su edad, comparando el peso del niño con los intervalos de la tabla de referencia.
+
+Para ello, desglosamos el código como sigue:
+-   Para cada madre, seleccionamos al hijo de menor edad, según las instrucciones del índice. Para ello, guardamos en un arreglo la edad de cada uno de sus hijos y tomamos el índice del mínimo de ellos, guardado en $indice$_$niño$.
+-   Una vez seleccionado, debemos verificar si tiene un peso adecuado según su edad, entonces guardamos su edad y su peso en las variables $edad$_$niño$ y $peso$_$niño$, respectivamente.
+-   Con su edad, filtramos de la tabla de pesos adecuada $tabla$_$pesos$_$intervalos$ el intervalo correspondiente a su edad y verificamos si tiene un peso adecuado a su edad. En caso afirmativo, regresamos el valor $TRUE$ y $FALSE$ en otro caso.
+```{r funcion_peso_adecuado }
+peso_segun_tabla <- function(x) {
+  indice_niño <- which.min(x[1:8*4+1])[[1]]
+  edad_niño <- as.numeric(x[indice_niño*4+1])
+  peso_niño <- as.numeric(x[indice_niño*4+1+1])
+  intervalo_de_peso <- tabla_pesos_intervalos[tabla_pesos_intervalos$Mes == edad_niño, 2:3]
+  return(peso_niño > intervalo_de_peso$LimiteInferior & peso_niño < intervalo_de_peso$LimiteSuperior)
+}
+
+```
+## Cálculo del Índice
+Por definición $$índice=\frac{\text{#niños de 5 años con peso adecuado según su edad}}{\text{# niños menores a 5 años}}*100$$
+Para calcular el índice de toda la muestra, sabemos por construcción que el número de niños menores a 5 años corresponde al número de renglones de $data$_$filtrado$, y utilizamos la función $peso$_$segun$_$tabla$ para contar el número de niños menores a 5 años con peso adecuado como sigue:
+```{r indice_general}
+numerador <- sum(apply(data_filtrada, 1, peso_segun_tabla))
+denominador <- nrow(data_filtrada)
+indice <- numerador / denominador * 100
+print(indice)
+
+```
+## Cálculo del Índice por Zona y Encuestador
+Definimos una función que calcula el índice para un subconjunto de datos, como si filtraramos por zona o por encuestador. Luego, calculamos el índice para cada zona y para cada encuestador.
+
+```{r def_calculo_indices}
+calculo_indice <- function(data) {
+  denominador <- sum(apply(data, 1, function(x) any(x[c(1:8*4+1)] < 12*5 & !is.na(x[c(1:8*4+1)]))))
+  numerador <- sum(apply(data, 1, peso_segun_tabla))
+  return(numerador / denominador * 100)
+}
+
+```
+### Índice por zona
+```{r por_zona}
+zona <- c()
+indice <- c()
+for(id in unique(data_filtrada$zona_id)) {
+  data_filtrada_1 <- data_filtrada[data_filtrada$zona_id == id,]
+  zona <- append(zona, id)
+  indice <- append(indice, calculo_indice(data_filtrada_1))
+}
+por_zona <- setNames(as.data.frame(matrix(c(zona, indice), ncol=2, nrow=length(zona), byrow=F)), c("zona_id", "indice"))
+
+```
+Mostramos los primers 5 índices de cada zona:
+```{r ver_por_zona, echo=F}
+head(por_zona,5)
+```
+### Por encuestador
+Repetimos el proceso para cada encuestador según su id único
+```{r por_encuestador, include=F}
+encuestador <- c()
+indice <- c()
+for(id in unique(data_filtrada$encuestador_id)) {
+  data_filtrada_1 <- data_filtrada[data_filtrada$encuestador_id == id,]
+  encuestador <- append(encuestador, id)
+  indice <- append(indice, calculo_indice(data_filtrada_1))
+}
+por_encuestador <- setNames(as.data.frame(matrix(c(encuestador, indice), ncol=2, nrow=length(encuestador), byrow=F)), c("encuestador_id", "indice"))
+```
+
+```{r ver_encuestador, echo=F}
+head(por_encuestador,5)
+```
+# Resultados
+## Comparación por zona
+Utilizando el índice calculado anteriormente para cada zona, exploraremos si existe una diferencia significativa en alguno de ellos.
+Iniciamos de manera sencilla, suponiendo e ignorando la información de clasificación de la zona $P_iC_jE_k$. Para simplificar, suponemos que cada zona es independiente.
+Consideramos un histograma para ver una aproximación de la distribución de los datos: 
+```{r graf, echo=F, fig.align='center'}
+hist(as.numeric(por_zona$indice),xlab = "Índice",ylab = "Frecuencia",main='Histograma de índice por zona')
+
+```
+Es claro un sesgo a valores cercanos a 100, lo cual se puede respaldar con un valor de kurtosis$<0$. De hecho, la kurtosis tiene un valor de -1.2, lo cual se puede considerar un indicador de que nuestra distribución no es normal y por lo tanto no es ideal considerar un ANOVA para encontrar diferencias significativas en alguna zona.
+
+Como alternativa, consideraremos la prueba de Kruskal-Wallis, una prueba estadística no paramétrica utilizada para determinar si existen diferencias significativas entre tres o más grupos independientes, que no requiere la hipótesis de normalidad.
+
+```{r kurskal, message=F}
+kruskal_result <- kruskal.test(indice ~ zona_id, data = por_zona)
+kruskal_result
+
+```
+La interpretación se desarrollará en la parte de conclusiones, pero por lo pronto, no podemos afirmar que exista una diferencia significativa en alguna de las zonas.
+## Comparación por encuestador
+Repetimos el procedimiento, ahora considerando el índice obtenido por encuestador, a fin de verificar si alguno de los encuestadores tuvo una diferencia significativa al momento de tomar medidas antropométricas.
+```{r}
+kruskal_result_encuestador <- kruskal.test(indice ~ encuestador_id, data = por_encuestador)
+kruskal_result_encuestador
+```
+De nuevo, no podemos afirmar que alguno de los encuestadores haya tenido una diferencia significativa.
+
+
+
+# Conclusión
+Satisfactoriamente se elabora un código fácilmente legible para que cualquiera con interés sea capaz de replicar los procedimientos, métodos y resultados obtenidos. 
+Como limitante, encontramos una pérdida de la proximidad provista por la componente geográfica. Por ejemplo, considerando grupos de datos según el país del que provienen, un análisis de manera local podría conllevar a resultados diferentes, tanto en la normalidad de los datos como en la correcta capacitación de los encuestadores.
