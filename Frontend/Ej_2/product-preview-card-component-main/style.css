@@ -1,0 +1,46 @@
+main {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* This changes the layout for screens wider than 48em */
+  @media (min-width: 375px) {
+    .attribution { font-size: 11px; text-align: center; }
+    .attribution a { color: hsl(228, 45%, 44%); }
+    body{
+        background-color: hsl(30, 38%, 92%);
+    }
+    .card_item{
+        background-color: white;
+        margin-top: 30px;
+        margin-left: 15px;
+        margin-right: 15px;
+        margin-bottom: 30px;
+        width: 340px;
+        height: auto;
+        border-radius: 15px;
+    }
+    .card_item h1{
+        margin-left: 20px;
+        margin-right: 20px;
+    }
+    .card_item h2{
+        margin-left: 20px;
+        margin-right: 20px;
+        color: gray;
+        font-size: 16px;
+        font-family: Montserrat;
+    }
+    .card_item p{
+        display: inline-flex;
+    }
+    .card_item button{
+        display:flex;
+        margin-top: 55px;
+        margin-left: 110px;
+        margin-right: 15px;
+        margin-bottom: 15px;
+        
+    }
+  }
+
